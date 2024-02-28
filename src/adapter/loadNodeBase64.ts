@@ -1,10 +1,9 @@
-import canvasModule from 'canvas';
 import { extensions, ExtensionType, Texture, TextureSource, utils } from '@pixi/core';
 import { NodeCanvasElement } from './NodeCanvasElement';
+import { loadImage } from '@napi-rs/canvas';
 
 import type { LoaderParser, ResolvedAsset } from '@pixi/assets';
 
-const { loadImage } = canvasModule;
 const validMimes = ['image/png', 'image/jpg', 'image/jpeg', 'image/svg'];
 
 function isSupportedDataURL(url: string): boolean

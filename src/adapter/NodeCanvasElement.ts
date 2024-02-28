@@ -1,20 +1,12 @@
-import canvasModule from 'canvas';
-import createGLContext from 'gl';
 import { ICanvasRenderingContext2D, utils } from '@pixi/core';
+import { AvifConfig, Canvas, ContextAttributes, SKRSContext2D } from '@napi-rs/canvas';
 
-import type {
-    CanvasRenderingContext2D, JpegConfig, NodeCanvasRenderingContext2DSettings, PdfConfig, PngConfig,
-} from 'canvas';
-import type {
-    STACKGL_resize_drawingbuffer, // eslint-disable-line camelcase
-    StackGLExtension,
-} from 'gl';
-import type { ContextIds, ContextSettings, ICanvas, ICanvasRenderingContext2DSettings } from '@pixi/core';
-
-const { Canvas, Image, createImageData } = canvasModule;
+import type { ContextIds, ICanvas } from '@pixi/core';
 
 /** Obtain the parameters of a function type in a tuple, except the first one */
 type ParametersExceptFirst<T extends (...args: any) => any> = T extends (arg0: any, ...args: infer P) => any ? P : never;
+
+type CanvasRenderingContext2D = SKRSContext2D;
 
 /**
  * A node implementation of a canvas element.
@@ -27,18 +19,14 @@ export class NodeCanvasElement implements ICanvas
     /** Style of the canvas. */
     public style: Record<string, any>;
 
-    private _canvas: canvasModule.Canvas;
+    private _canvas: Canvas;
     private _event: utils.EventEmitter;
     private _contextType?: ContextIds;
     private _ctx?: CanvasRenderingContext2D;
-    private _gl?: WebGLRenderingContext & StackGLExtension;
-    private _glExtensions?: {
-        resizeDrawingBuffer?: STACKGL_resize_drawingbuffer | null; // eslint-disable-line camelcase
-    };
 
-    constructor(width = 1, height = 1, type?: 'image' | 'pdf' | 'svg')
+    constructor(width = 1, height = 1)
     {
-        this._canvas = new Canvas(width, height, type);
+        this._canvas = new Canvas(width, height);
         this._event = new utils.EventEmitter();
         this.style = {};
     }
@@ -50,7 +38,6 @@ export class NodeCanvasElement implements ICanvas
 
     set width(value)
     {
-        this._glExtensions?.resizeDrawingBuffer?.resize(value, this.height);
         this._canvas.width = value;
     }
 
@@ -61,7 +48,6 @@ export class NodeCanvasElement implements ICanvas
 
     set height(value)
     {
-        this._glExtensions?.resizeDrawingBuffer?.resize(this.width, value);
         this._canvas.height = value;
     }
 
@@ -75,26 +61,11 @@ export class NodeCanvasElement implements ICanvas
         return this._canvas.height;
     }
 
+    // @ts-expect-error 这里暂时无法兼容
     getContext(
-        contextId: '2d',
-        options?: ICanvasRenderingContext2DSettings | NodeCanvasRenderingContext2DSettings,
-    ): ICanvasRenderingContext2D | null;
-    getContext(
-        contextId: 'bitmaprenderer',
-        options?: ImageBitmapRenderingContextSettings | NodeCanvasRenderingContext2DSettings,
-    ): null;
-    getContext(
-        contextId: 'webgl' | 'experimental-webgl',
-        options?: WebGLContextAttributes | NodeCanvasRenderingContext2DSettings,
-    ): WebGLRenderingContext | null;
-    getContext(
-        contextId: 'webgl2' | 'experimental-webgl2',
-        options?: WebGLContextAttributes | NodeCanvasRenderingContext2DSettings,
-    ): null;
-    getContext(
-        type: ContextIds,
-        options?: ContextSettings | NodeCanvasRenderingContext2DSettings,
-    ): ICanvasRenderingContext2D | WebGLRenderingContext | null
+        type: string,
+        options?: ContextAttributes,
+    ): ICanvasRenderingContext2D | null
     {
         switch (type)
         {
@@ -103,7 +74,7 @@ export class NodeCanvasElement implements ICanvas
                 if (this._contextType && this._contextType !== '2d') return null;
                 if (this._ctx) return this._ctx as unknown as ICanvasRenderingContext2D;
 
-                const ctx = this._canvas.getContext('2d', options as NodeCanvasRenderingContext2DSettings);
+                const ctx = this._canvas.getContext('2d', options as ContextAttributes);
 
                 this._patch2DContext(ctx);
 
@@ -111,28 +82,6 @@ export class NodeCanvasElement implements ICanvas
                 this._contextType = '2d';
 
                 return ctx as unknown as ICanvasRenderingContext2D;
-            }
-            case 'webgl':
-            case 'experimental-webgl':
-            {
-                if (this._contextType && this._contextType !== 'webgl') return null;
-                if (this._gl) return this._gl;
-
-                const { width, height } = this;
-
-                const ctx = this._canvas.getContext('2d', options as NodeCanvasRenderingContext2DSettings);
-                const gl = createGLContext(width, height, options as WebGLContextAttributes);
-
-                this._patchGLContext(gl);
-
-                this._ctx = ctx;
-                this._gl = gl;
-                this._glExtensions = {
-                    resizeDrawingBuffer: gl.getExtension('STACKGL_resize_drawingbuffer'),
-                };
-                this._contextType = 'webgl';
-
-                return gl;
             }
             default: return null;
         }
@@ -143,18 +92,10 @@ export class NodeCanvasElement implements ICanvas
      * encodes the canvas as a PDF. For SVG canvases, encodes the canvas as an
      * SVG.
      */
-    toBuffer(cb: (err: Error | null, result: Buffer) => void): void;
-    toBuffer(cb: (err: Error | null, result: Buffer) => void, mimeType: 'image/png', config?: PngConfig): void;
-    toBuffer(cb: (err: Error | null, result: Buffer) => void, mimeType: 'image/jpeg', config?: JpegConfig): void;
-    /**
-     * For image canvases, encodes the canvas as a PNG. For PDF canvases,
-     * encodes the canvas as a PDF. For SVG canvases, encodes the canvas as an
-     * SVG.
-     */
     toBuffer(): Buffer;
-    toBuffer(mimeType: 'image/png', config?: PngConfig): Buffer;
-    toBuffer(mimeType: 'image/jpeg', config?: JpegConfig): Buffer;
-    toBuffer(mimeType: 'application/pdf', config?: PdfConfig): Buffer;
+    toBuffer(mime: 'image/png'): Buffer;
+    toBuffer(mime: 'image/jpeg' | 'image/webp', quality?: number): Buffer;
+    toBuffer(mime: 'image/avif', cfg?: AvifConfig): Buffer;
     /**
      * Returns the unencoded pixel data, top-to-bottom. On little-endian (most)
      * systems, the array will be ordered BGRA; on big-endian systems, it will
@@ -167,34 +108,22 @@ export class NodeCanvasElement implements ICanvas
      */
     toBuffer(...args: any): Buffer | void
     {
-        this._updateContext();
-
-        return this._canvas.toBuffer(...args as Parameters<typeof canvasModule.Canvas.prototype.toBuffer>);
+        return this._canvas.toBuffer(...args as Parameters<typeof Canvas.prototype.toBuffer>);
     }
 
     /** Defaults to PNG image. */
     toDataURL(): string;
-    toDataURL(mimeType: 'image/png'): string;
-    toDataURL(mimeType: 'image/jpeg', quality?: number): string;
-    /** _Non-standard._ Defaults to PNG image. */
-    toDataURL(cb: (err: Error | null, result: string) => void): void;
-    /** _Non-standard._ */
-    toDataURL(mimeType: 'image/png', cb: (err: Error | null, result: string) => void): void;
-    /** _Non-standard._ */
-    toDataURL(mimeType: 'image/jpeg', cb: (err: Error | null, result: string) => void): void;
-    /** _Non-standard._ */
-    toDataURL(mimeType: 'image/jpeg', config: JpegConfig, cb: (err: Error | null, result: string) => void): void;
-    /** _Non-standard._ */
-    toDataURL(mimeType: 'image/jpeg', quality: number, cb: (err: Error | null, result: string) => void): void;
+    toDataURL(mime?: 'image/png'): string;
+    toDataURL(mime: 'image/jpeg' | 'image/webp', quality?: number): string;
+    toDataURL(mime?: 'image/jpeg' | 'image/webp' | 'image/png', quality?: number): string;
+    toDataURL(mime?: 'image/avif', cfg?: AvifConfig): string;
     /**
      * Returns a base64 encoded string representation of the canvas.
      * @param args - The arguments to pass to the toDataURL method.
      */
     toDataURL(...args: any): string | void
     {
-        this._updateContext();
-
-        return this._canvas.toDataURL(...args as Parameters<typeof canvasModule.Canvas.prototype.toDataURL>);
+        return this._canvas.toDataURL(...args as Parameters<typeof Canvas.prototype.toDataURL>);
     }
 
     /**
@@ -254,51 +183,10 @@ export class NodeCanvasElement implements ICanvas
 
                 return new Uint8Array(0);
             }
-            case 'webgl':
-            {
-                const { width, height, _gl: gl } = this;
-
-                const lineByteCount = 4 * width;
-                const pixels = new Uint8Array(height * lineByteCount);
-
-                gl?.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-
-                const tmp = new Uint8Array(lineByteCount);
-
-                // Reverse row order
-                for (let srcRow = 0; srcRow < height >> 1; srcRow++)
-                {
-                    const dstRow = height - srcRow - 1;
-                    const srcIndex = srcRow * lineByteCount;
-                    const dstIndex = dstRow * lineByteCount;
-                    const src = pixels.subarray(srcIndex, srcIndex + lineByteCount);
-                    const dst = pixels.subarray(dstIndex, dstIndex + lineByteCount);
-
-                    tmp.set(dst);
-                    dst.set(src);
-                    src.set(tmp);
-                }
-
-                return pixels;
-            }
             default:
             {
                 throw new Error('getContext() has not been called');
             }
-        }
-    }
-
-    /** Copy pixels from GL context to 2D context. */
-    private _updateContext()
-    {
-        if (this._contextType === 'webgl')
-        {
-            const { width, height, _ctx: ctx } = this;
-
-            const pixels = this._getPixels();
-            const imageData = createImageData(new Uint8ClampedArray(pixels.buffer), width, height);
-
-            ctx?.putImageData(imageData, 0, 0);
         }
     }
 
@@ -314,7 +202,6 @@ export class NodeCanvasElement implements ICanvas
         {
             if (image instanceof NodeCanvasElement)
             {
-                image._updateContext();
                 image = image._canvas;
             }
 
@@ -327,85 +214,10 @@ export class NodeCanvasElement implements ICanvas
         {
             if (image instanceof NodeCanvasElement)
             {
-                image._updateContext();
                 image = image._canvas;
             }
 
             return _createPattern.call(this, image, ...args as ParametersExceptFirst<typeof _createPattern>);
-        };
-    }
-
-    /**
-     * Patch the GL context.
-     * @param gl - The GL context.
-     */
-    private _patchGLContext(gl: WebGLRenderingContext & StackGLExtension)
-    {
-        const _getUniformLocation = gl.getUniformLocation;
-
-        type Program = WebGLProgram & { _uniforms: any[] };
-        // Temporary fix https://github.com/stackgl/headless-gl/issues/170
-        gl.getUniformLocation = function getUniformLocation(program: Program, name)
-        {
-            if (program._uniforms && !(/\[\d+\]$/).test(name))
-            {
-                const reg = new RegExp(`${name}\\[\\d+\\]$`);
-
-                for (let i = 0; i < program._uniforms.length; i++)
-                {
-                    const _name = program._uniforms[i].name;
-
-                    if (reg.test(_name))
-                    {
-                        name = _name;
-                    }
-                }
-            }
-
-            return _getUniformLocation.call(this, program, name);
-        };
-
-        /**
-         * Convert TexImageSource argument for GL context.
-         * @param source
-         */
-        function convertTexImageSource(source: any): any
-        {
-            if (source instanceof NodeCanvasElement)
-            {
-                source._updateContext();
-
-                return source;
-            }
-            if (source instanceof Image)
-            {
-                const { width, height } = source;
-                const canvas = new Canvas(width, height);
-
-                canvas.getContext('2d').drawImage(source, 0, 0);
-
-                return source;
-            }
-
-            return source;
-        }
-
-        const _texImage2D = gl.texImage2D;
-
-        gl.texImage2D = function texImage2D(...args: any)
-        {
-            args[args.length - 1] = convertTexImageSource(args[args.length - 1]);
-
-            return _texImage2D.apply(this, args);
-        };
-
-        const _texSubImage2D = gl.texSubImage2D;
-
-        gl.texSubImage2D = function texSubImage2D(...args: any)
-        {
-            args[args.length - 1] = convertTexImageSource(args[args.length - 1]);
-
-            return _texSubImage2D.apply(this, args);
         };
     }
 }

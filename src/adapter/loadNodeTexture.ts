@@ -1,10 +1,9 @@
-import canvasModule from 'canvas';
 import { extensions, ExtensionType, settings, Texture, TextureSource, utils } from '@pixi/core';
 import { NodeCanvasElement } from './NodeCanvasElement';
+import { loadImage } from '@napi-rs/canvas';
 
 import type { LoaderParser, ResolvedAsset } from '@pixi/assets';
 
-const { loadImage } = canvasModule;
 const validImages = ['.jpg', '.png', '.jpeg', '.svg'];
 
 /** loads our textures into a node canvas */

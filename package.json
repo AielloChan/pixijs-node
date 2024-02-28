@@ -48,6 +48,7 @@
     "@pixi/extension-scripts": "^2.0.0"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^0.1.50",
     "@pixi/app": "^7.3.0",
     "@pixi/assets": "^7.3.0",
     "@pixi/core": "^7.3.0",
@@ -76,9 +77,7 @@
     "@pixi/text-bitmap": "^7.3.0",
     "@types/gl": "^6.0.2",
     "@xmldom/xmldom": "^0.8.6",
-    "canvas": "^2.9.1",
-    "cross-fetch": "^3.1.5",
-    "gl": "^6.0.1"
+    "cross-fetch": "^3.1.5"
   },
   "publishConfig": {
     "access": "public"

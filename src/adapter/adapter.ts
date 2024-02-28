@@ -1,7 +1,5 @@
-import canvasModule from 'canvas';
 import { fetch, Request, Response } from 'cross-fetch';
 import fs from 'fs';
-import { WebGLRenderingContext } from 'gl';
 import { settings, utils } from '@pixi/core';
 import { NodeCanvasElement } from './NodeCanvasElement';
 import { DOMParser } from '@xmldom/xmldom';
@@ -11,14 +9,19 @@ import type { IAdapter } from '@pixi/core';
 export const NodeAdapter = {
     /**
      * Creates a canvas element of the given size.
-     * This canvas is created using the node-canvas package and uses the gl package to create a webgl context.
      * @param width - width of the canvas
      * @param height - height of the canvas
      */
     createCanvas: (width?: number, height?: number) => new NodeCanvasElement(width, height),
-    getCanvasRenderingContext2D: () => canvasModule.CanvasRenderingContext2D,
+    getCanvasRenderingContext2D: () =>
+    {
+        throw new Error('current not support getCanvasRenderingContext2D');
+    },
     /** Returns a WebGL rendering context using the gl package. */
-    getWebGLRenderingContext: () => WebGLRenderingContext,
+    getWebGLRenderingContext: () =>
+    {
+        throw new Error('current not support gl');
+    },
     /** Returns the fake user agent string of `node` */
     getNavigator: () => ({ userAgent: 'node' }),
     /** Returns the path from which the process is being run */

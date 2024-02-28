@@ -1,4 +1,3 @@
-import canvasModule from 'canvas';
 import { NodeCanvasElement } from '../src';
 
 describe('NodeCanvasElement', () =>
@@ -44,25 +43,7 @@ describe('NodeCanvasElement', () =>
 
             const ctx = canvas.getContext('2d');
 
-            expect(ctx).toBeInstanceOf(canvasModule.CanvasRenderingContext2D);
             expect(canvas.getContext('2d')).toBe(ctx);
-        });
-
-        it('should get WebGL context', () =>
-        {
-            const canvas1 = new NodeCanvasElement(1, 1);
-            const gl1 = canvas1.getContext('webgl');
-
-            expect(gl1).toBeTruthy();
-            expect(canvas1.getContext('webgl')).toBe(gl1);
-            expect(canvas1.getContext('experimental-webgl')).toBe(gl1);
-
-            const canvas2 = new NodeCanvasElement(1, 1);
-            const gl2 = canvas2.getContext('experimental-webgl');
-
-            expect(gl2).toBeTruthy();
-            expect(canvas2.getContext('experimental-webgl')).toBe(gl2);
-            expect(canvas2.getContext('webgl')).toBe(gl2);
         });
 
         it('should return null with unsupported context ID', () =>
@@ -70,25 +51,6 @@ describe('NodeCanvasElement', () =>
             const canvas = new NodeCanvasElement(1, 1);
 
             expect(canvas.getContext('bitmaprenderer')).toBeNull();
-            expect(canvas.getContext('webgl2')).toBeNull();
-            expect(canvas.getContext('experimental-webgl2')).toBeNull();
-        });
-
-        it('should return null with another context ID', () =>
-        {
-            const canvas1 = new NodeCanvasElement(1, 1);
-            const ctx1 = canvas1.getContext('2d');
-            const gl1 = canvas1.getContext('webgl');
-
-            expect(ctx1).toBeInstanceOf(canvasModule.CanvasRenderingContext2D);
-            expect(gl1).toBeNull();
-
-            const canvas2 = new NodeCanvasElement(1, 1);
-            const gl2 = canvas2.getContext('webgl');
-            const ctx2 = canvas2.getContext('2d');
-
-            expect(gl2).toBeTruthy();
-            expect(ctx2).toBeNull();
         });
     });
 });
